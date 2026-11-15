@@ -1,0 +1,16 @@
+[
+  {"id": "Q1", "question": "How fast must Northline acknowledge a new claim in writing?", "doc": "CLM-001", "fact": ["1 business day"]},
+  {"id": "Q2", "question": "How fast must an appointed agent forward a notice of loss?", "doc": "CLM-001", "fact": ["same business day"]},
+  {"id": "Q3", "question": "A wind deductible is two percent. What amount is that percentage calculated on?", "doc": "CLM-002", "fact": ["stated insurance amount"]},
+  {"id": "Q4", "question": "May an adjuster record a caller without telling them?", "doc": "CLM-003", "fact": ["surprise recording", "violation"]},
+  {"id": "Q5", "question": "What is stair-stepping, and is it allowed?", "doc": "CLM-004", "fact": ["small reserve increases", "defect"]},
+  {"id": "Q6", "question": "When must a mortgagee be named on a dwelling payment?", "doc": "CLM-005", "fact": ["$10,000"]},
+  {"id": "Q7", "question": "How fast is an agreed property payment issued after the payee is verified?", "doc": "CLM-005", "fact": ["5 business days"]},
+  {"id": "Q8", "question": "Can an adjuster deny a claim over the phone?", "doc": "CLM-006", "fact": ["orally", "in writing"]},
+  {"id": "Q9", "question": "Does a claim on a brand-new policy go to Special Investigation by itself?", "doc": "CLM-007", "fact": ["not, by itself, a referral"]},
+  {"id": "Q10", "question": "What expected net recovery is required before Northline pursues a third party?", "doc": "CLM-008", "fact": ["$1,000"]},
+  {"id": "Q11", "question": "Who is allowed to decide an appeal of a denial?", "doc": "CLM-009", "fact": ["did not make the original decision"]},
+  {"id": "Q12", "question": "Where is the employee parking benefit described?", "doc": null, "fact": []},
+  {"id": "Q13", "question": "Do we price match competitor premiums?", "doc": null, "fact": []},
+  {"id": "Q14", "question": "How fast is that?", "history_question": "How fast must an appointed agent forward a notice of loss?", "doc": "CLM-001", "fact": ["same business day"], "standalone_must_mention": ["agent", "forward"]}
+]
