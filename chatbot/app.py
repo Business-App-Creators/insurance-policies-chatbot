@@ -11,7 +11,7 @@ import uuid
 
 import gradio as gr
 
-from chatbot.agents.sequential.graph import build_graph, format_result
+from chatbot.agents.sequential.graph import build_graph, format_result, run_config
 
 GRAPH = build_graph()
 
@@ -46,7 +46,7 @@ def ask(message: str, history: list[dict] | None, thread_id: str):
     try:
         result = GRAPH.invoke(
             {"question": message, "history": prior, "attempts": 0},
-            config={"configurable": {"thread_id": thread_id}},
+            config=run_config(thread_id),
         )
     except Exception as exc:
         raise gr.Error(str(exc)[:300]) from exc

@@ -12,7 +12,7 @@ import json
 import uuid
 from pathlib import Path
 
-from chatbot.agents.sequential.graph import build_graph, format_result
+from chatbot.agents.sequential.graph import build_graph, run_config
 
 QUESTIONS = Path(__file__).resolve().parent / "questions.json"
 PASS_BAR = 12
@@ -34,7 +34,7 @@ def _ask(graph, item: dict) -> dict:
     if item.get("history_question"):
         first = graph.invoke(
             {"question": item["history_question"], "history": [], "attempts": 0},
-            config={"configurable": {"thread_id": thread + "-setup"}},
+            config=run_config(thread + "-setup"),
         )
         history = [
             {"role": "user", "content": item["history_question"]},
@@ -42,7 +42,7 @@ def _ask(graph, item: dict) -> dict:
         ]
     return graph.invoke(
         {"question": item["question"], "history": history, "attempts": 0},
-        config={"configurable": {"thread_id": thread}},
+        config=run_config(thread),
     )
 
 

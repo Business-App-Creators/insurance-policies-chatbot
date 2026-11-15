@@ -24,6 +24,9 @@ ROOT = Path(__file__).resolve().parents[3]
 POLICY_TOOL = ROOT / "data ingestion pipeline" / "policy_tool.py"
 REFUSAL = "The files do not contain that."
 CHAT_MODEL = os.environ.get("CHAT_MODEL", "gpt-4o-mini")
+MAX_ATTEMPTS = 5
+# rewrite, retrieve, then generate and verify up to five times, then refuse.
+RECURSION_LIMIT = 2 + (2 * MAX_ATTEMPTS) + 2
 
 
 class Citation(TypedDict, total=False):
@@ -168,6 +171,8 @@ def _cover(answer: str, citations: list[Citation], passages: list[Passage]) -> l
 def generate(state: State) -> dict:
     """Answer in the model's own words and cite a sentence copied from Chroma."""
     retrieved = state.get("retrieved") or []
+    if state.get("attempts", 0) >= MAX_ATTEMPTS:
+        return {"refusal": True, "attempts": state.get("attempts", 0)}
     attempt = state.get("attempts", 0) + 1
     if not retrieved:
         return {"answer": REFUSAL, "citations": [], "refusal": True, "attempts": attempt}
@@ -250,7 +255,7 @@ def verify(state: State) -> dict:
 
 
 def refuse(state: State) -> dict:
-    """Keep the closest passage visible after a quote fails twice."""
+    """Keep the closest passage visible after the quote fails five times."""
     top = (state.get("retrieved") or [None])[0]
     citations = []
     if top:
@@ -298,9 +303,17 @@ def format_result(result: State) -> str:
 def route_after_verify(state: State) -> Literal["generate", "refuse", "__end__"]:
     if state.get("citation_ok"):
         return END
-    if state.get("attempts", 0) < 2:
+    if state.get("attempts", 0) < MAX_ATTEMPTS:
         return "generate"
     return "refuse"
+
+
+def run_config(thread_id: str) -> dict:
+    """Thread id plus a step ceiling so a routing bug cannot call the model forever."""
+    return {
+        "recursion_limit": RECURSION_LIMIT,
+        "configurable": {"thread_id": thread_id},
+    }
 
 
 def build_graph():
@@ -327,6 +340,6 @@ if __name__ == "__main__":
     app = build_graph()
     result = app.invoke(
         {"question": question, "history": [], "attempts": 0},
-        config={"configurable": {"thread_id": "starter"}},
+        config=run_config("starter"),
     )
     print(format_result(result))
