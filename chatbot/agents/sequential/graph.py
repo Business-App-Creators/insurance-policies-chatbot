@@ -69,8 +69,24 @@ def _flat(text: str) -> str:
 
 
 def rewrite(state: State) -> dict:
-    """Copy the question. A cheaper chat model will rewrite follow-ups later."""
-    return {"standalone_question": state["question"], "attempts": state.get("attempts", 0)}
+    """Turn a follow-up into one standalone question. Do not answer it."""
+    question = state["question"]
+    history = state.get("history") or []
+    if not history:
+        return {"standalone_question": question, "attempts": 0}
+    if not os.environ.get("OPENAI_API_KEY"):
+        raise RuntimeError("Set OPENAI_API_KEY before asking the chat model.")
+    transcript = "\n".join(
+        f"{turn.get('role', 'user')}: {turn.get('content', '')}" for turn in history
+    )
+    prompt = (
+        "Rewrite the follow-up as one standalone question. "
+        "Resolve words like 'that' from the conversation. Do not answer it.\n\n"
+        f"Conversation:\n{transcript}\n\nFollow-up: {question}\n\nStandalone question:"
+    )
+    response = ChatOpenAI(model=CHAT_MODEL, temperature=0).invoke(prompt)
+    text = response.content if isinstance(response.content, str) else str(response.content)
+    return {"standalone_question": text.strip().strip('"'), "attempts": 0}
 
 
 def retrieve(state: State) -> dict:
@@ -168,13 +184,17 @@ def generate(state: State) -> dict:
     prompt = (
         "You answer questions about Northline Assurance claims manuals. "
         "Use only the records below. Do not invent a rule, a deadline, or an exception.\n"
-        "Write the answer in your own words. Do not paste a whole record into the answer.\n"
-        "Each citation quote must be copied exactly from a single record. "
+        "Write the answer in your own words, but keep the manual's own timing words, "
+        "dollar amounts, and defined terms. If a record says '1 business day' or "
+        "'same business day', those words belong in the answer. A table row is a record.\n"
+        "Each citation quote must be copied exactly from a single record, and it must "
+        "include the sentence that states the rule you used. "
         "Never join two records into one quote. A sentence that ends in a colon and the "
         "list under it are different records: cite the sentence as one quote and the list "
-        "items you use as a second quote. Do not refuse when those records contain the rule.\n"
-        "If the records do not decide the question, set refusal to true and say the files "
-        "do not contain that. Still cite the closest record so the reader can see it.\n"
+        "items you use as a second quote. Do not refuse when a record states the rule.\n"
+        "If no record states the rule the question asks for, set refusal to true and say "
+        "the files do not contain that. A neighboring topic is not enough. Still cite "
+        "the closest record so the reader can see it.\n"
         f"{correction}\n"
         f"Question: {state['standalone_question']}\n\n"
         f"Records:\n{_records(retrieved)}\n\n"

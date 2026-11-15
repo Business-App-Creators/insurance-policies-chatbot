@@ -10,7 +10,9 @@ its topic, and the original policy file so an agent can cite the source.
 """
 
 import importlib.util
+import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -21,6 +23,89 @@ from openai import OpenAI
 ROOT = Path(__file__).resolve().parents[1]
 DB_DIR = ROOT / "DB"
 DEFAULT_RESULTS = 4
+_STOP = {
+    "a", "an", "the", "of", "to", "and", "or", "in", "on", "for", "is", "are",
+    "be", "by", "with", "that", "this", "how", "what", "when", "who", "must",
+    "may", "do", "does", "did", "not", "from", "over", "its", "their", "they",
+}
+
+
+def _tokens(text: str) -> set[str]:
+    return {
+        token
+        for token in re.findall(r"[a-z0-9]+", text.lower())
+        if token not in _STOP and len(token) > 2
+    }
+
+
+def _stem(token: str) -> str:
+    for suffix in ("ing", "ed", "es", "s"):
+        if token.endswith(suffix) and len(token) - len(suffix) >= 5:
+            return token[: -len(suffix)]
+    return token
+
+
+def _as_passage(chunk: dict) -> dict:
+    return {
+        "doc_id": chunk.get("doc_id", ""),
+        "title": chunk.get("title", ""),
+        "topic": chunk.get("topic", ""),
+        "reference": chunk.get("reference", ""),
+        "text": chunk.get("text", ""),
+        "distance": 1.0,
+    }
+
+
+def _supplements(query: str, passages: list[dict]) -> list[dict]:
+    """Add the paragraph that shares the question's words, and a matching definition.
+
+    The four nearest embeddings often land in the right manual and miss the
+    sentence that states the rule. These two lookups read the chunk file only.
+    """
+    path = DB_DIR / "chunks.json"
+    if not path.exists():
+        return []
+    chunks = json.loads(path.read_text(encoding="utf-8"))
+    question = _tokens(query)
+    question_stems = {_stem(token) for token in question}
+    seen = {passage["text"] for passage in passages}
+    extras = []
+
+    def lexical(chunk: dict) -> int:
+        return len(question & _tokens(chunk["text"]))
+
+    ranked = sorted(chunks, key=lexical, reverse=True)
+    for chunk in ranked:
+        if lexical(chunk) < 3 or chunk["text"] in seen:
+            continue
+        extras.append(_as_passage(chunk))
+        seen.add(chunk["text"])
+        if len(extras) == 2:
+            break
+
+    def topic_key(chunk: dict) -> tuple:
+        raw = [
+            token
+            for token in re.findall(r"[a-z0-9]+", chunk["topic"].lower())
+            if token not in _STOP and len(token) > 2
+        ]
+        topic = [_stem(token) for token in raw]
+        hits = len(set(topic) & question_stems)
+        first = 1 if topic and topic[0] in question_stems else 0
+        defined = 1 if chunk["text"].startswith("**") else 0
+        coverage = hits / len(topic) if topic else 0
+        return (first, defined, hits, coverage, -len(chunk["text"]))
+
+    topic_added = 0
+    for chunk in sorted(chunks, key=topic_key, reverse=True):
+        if topic_key(chunk)[2] < 1 or chunk["text"] in seen:
+            continue
+        extras.append(_as_passage(chunk))
+        seen.add(chunk["text"])
+        topic_added += 1
+        if topic_added == 2:
+            break
+    return extras
 
 
 def _store():
@@ -77,6 +162,7 @@ def search_passages(query: str, k: int = DEFAULT_RESULTS) -> list[dict]:
                 "distance": distance,
             }
         )
+    passages.extend(_supplements(query, passages))
     return passages
 
 
